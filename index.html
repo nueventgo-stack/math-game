@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>麥塊乘法冒險 - Minecraft Math Adventure</title>
+    <!-- 引入 React, ReactDOM, Babel, Tailwind -->
+    <script
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+      crossorigin
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+      crossorigin
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #add8e6;
+      }
+      /* 自定義動畫樣式 */
+      @keyframes mining {
+        0% {
+          transform: rotate(0deg);
+        }
+        25% {
+          transform: rotate(-45deg);
+        }
+        50% {
+          transform: rotate(45deg);
+        }
+        75% {
+          transform: rotate(40deg);
+        }
+        100% {
+          transform: rotate(0deg);
+        }
+      }
+      .animate-mining {
+        animation: mining 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+      }
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-5px) rotate(-5deg);
+        }
+        75% {
+          transform: translateX(5px) rotate(5deg);
+        }
+      }
+      .animate-shake {
+        animation: shake 0.2s ease-in-out;
+      }
+      @keyframes particle {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--tx, 20px), var(--ty, -20px)) scale(0);
+          opacity: 0;
+        }
+      }
+      .animate-particle {
+        animation: particle 0.3s ease-out forwards;
+        --tx: calc(cos(var(--angle)) * 30px);
+        --ty: calc(sin(var(--angle)) * 30px);
+      }
+      @keyframes fall {
+        0% {
+          transform: translateY(-10vh) rotate(0deg);
+        }
+        100% {
+          transform: translateY(110vh) rotate(360deg);
+        }
+      }
+      .animate-fall {
+        animation: fall 3s linear infinite;
+      }
+      .animate-bounce-slow {
+        animation: bounce 2s infinite;
+      }
+      .animate-spin-slow {
+        animation: spin 4s linear infinite;
+      }
+      @keyframes bounce {
+        0%,
+        100% {
+          transform: translateY(-25%);
+          animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+        }
+        50% {
+          transform: translateY(0);
+          animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+        }
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      // --- 模擬 Lucide Icons (修正 Size 屬性) ---
+      const Icon = ({ d, className, width, height, size, ...props }) => (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size || width || "24"}
+          height={size || height || "24"}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          {...props}
+        >
+          {d}
+        </svg>
+      );
+      const Gem = (p) => (
+        <Icon d={<path d="M6 3h12l4 6-10 13L2 9Z" />} {...p} />
+      );
+      const RotateCcw = (p) => (
+        <Icon
+          d={
+            <>
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" />
+              <path d="M3 3v9h9" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const X = (p) => (
+        <Icon
+          d={
+            <>
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const BookOpen = (p) => (
+        <Icon
+          d={
+            <>
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const Eraser = (p) => (
+        <Icon
+          d={
+            <>
+              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+              <path d="M22 21H7" />
+              <path d="m5 11 9 9" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const Trophy = (p) => (
+        <Icon
+          d={
+            <>
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+              <path d="M4 22h16" />
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const Star = (p) => (
+        <Icon
+          d={
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          }
+          {...p}
+        />
+      );
+      const Sparkles = (p) => (
+        <Icon
+          d={
+            <>
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+              <path d="M5 3v4" />
+              <path d="M9 5h4" />
+              <path d="M19 3v4" />
+              <path d="M15 5h4" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const Volume2 = (p) => (
+        <Icon
+          d={
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const VolumeX = (p) => (
+        <Icon
+          d={
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </>
+          }
+          {...p}
+        />
+      );
+      const Flame = (p) => (
+        <Icon
+          d={
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3-1.1.8-2.2 1.5-3.2.7-1 2.3-1.5 3.5.7 1.5 2.7.5 5.5.5 5.5Z" />
+          }
+          {...p}
+        />
+      );
+      const Crown = (p) => (
+        <Icon
+          d={<path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />}
+          {...p}
+        />
+      );
+
+      // --- 樣式設定 ---
+      const pixelFont = {
+        fontFamily: '"Courier New", Courier, monospace',
+        fontWeight: "bold",
+      };
+      const colors = {
+        grass: "#589C33",
+        grassSide: "#3F7224",
+        dirt: "#8B5A2B",
+        stone: "#7D7D7D",
+        stoneDark: "#555555",
+        diamond: "#4DEEEA",
+        diamondDark: "#29B6B3",
+        diamondShadow: "#0E8280",
+        iron: "#E6E6E6",
+        ironDark: "#A0A0A0",
+        ironShadow: "#6B6B6B",
+        gold: "#FFD700",
+        steveSkin: "#E0AE8A",
+        steveHair: "#422712",
+        alexSkin: "#F0C096",
+        alexHair: "#C76F2E",
+        wood: "#6F4E37",
+        woodDark: "#4A3424",
+        book: "#8B4513",
+        fire: "#FF4500",
+        fireYellow: "#FFD700",
+      };
+
+      // --- 聲音引擎 ---
+      const playSound = (type, enabled = true, pitchShift = 0) => {
+        if (!enabled) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const now = ctx.currentTime;
+        const masterGain = ctx.createGain();
+        masterGain.connect(ctx.destination);
+
+        const createOsc = (type, freq, start, dur, vol = 0.1) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          const adjustedFreq = freq * (1 + pitchShift * 0.05);
+          osc.frequency.setValueAtTime(adjustedFreq, start);
+          gain.gain.setValueAtTime(vol, start);
+          gain.gain.exponentialRampToValueAtTime(0.01, start + dur);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start(start);
+          osc.stop(start + dur);
+        };
+        const createNoise = (start, dur, vol = 0.2) => {
+          const bufferSize = ctx.sampleRate * dur;
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const noiseGain = ctx.createGain();
+          noiseGain.gain.setValueAtTime(vol, start);
+          noiseGain.gain.exponentialRampToValueAtTime(0.01, start + dur);
+          noise.connect(noiseGain);
+          noiseGain.connect(masterGain);
+          noise.start(start);
+        };
+
+        switch (type) {
+          case "click":
+            createOsc("square", 150, now, 0.05, 0.1);
+            break;
+          case "mine":
+            createNoise(now, 0.1, 0.3);
+            createOsc("sawtooth", 50, now, 0.1, 0.1);
+            break;
+          case "correct":
+            const basePitch = 880;
+            const pitch = basePitch + Math.random() * 200;
+            const oscXP = ctx.createOscillator();
+            const gainXP = ctx.createGain();
+            oscXP.type = "sine";
+            oscXP.frequency.setValueAtTime(pitch, now);
+            oscXP.frequency.linearRampToValueAtTime(pitch + 200, now + 0.1);
+            gainXP.gain.setValueAtTime(0.3, now);
+            gainXP.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            oscXP.connect(gainXP);
+            gainXP.connect(masterGain);
+            oscXP.start(now);
+            oscXP.stop(now + 0.15);
+            break;
+          case "incorrect":
+            createOsc("sawtooth", 150, now, 0.2, 0.15);
+            createOsc("square", 100, now, 0.2, 0.15);
+            break;
+          case "levelup":
+            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+              createOsc("square", f, now + i * 0.1, 0.3, 0.1)
+            );
+            break;
+          case "milestone":
+            [523.25, 783.99, 1046.5, 1318.51, 1567.98].forEach((f, i) =>
+              createOsc("triangle", f, now + i * 0.05, 0.2, 0.1)
+            );
+            break;
+          case "fanfare":
+            [523.25, 523.25, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+              createOsc(
+                "sawtooth",
+                f,
+                now + i * 0.15,
+                i === 5 ? 0.6 : 0.15,
+                0.2
+              )
+            );
+            break;
+          case "pop":
+            createOsc("sine", 400, now, 0.05, 0.05);
+            break;
+        }
+      };
+
+      // --- 元件區 ---
+      const PixelRect = ({ x, y, w, h, fill }) => (
+        <rect x={x} y={y} width={w} height={h} fill={fill} />
+      );
+
+      const PickaxeTool = ({ material }) => {
+        const headColor = material === "diamond" ? colors.diamond : colors.iron;
+        const outline =
+          material === "diamond" ? colors.diamondDark : colors.ironDark;
+        const shadow =
+          material === "diamond" ? colors.diamondShadow : colors.ironShadow;
+        return (
+          <g transform="translate(6, 12) rotate(-45)">
+            <PixelRect x="10" y="10" w="4" h="26" fill={colors.wood} />
+            <PixelRect x="10" y="36" w="4" h="2" fill={colors.woodDark} />
+            <PixelRect x="11" y="30" w="2" h="2" fill={colors.woodDark} />
+            <PixelRect x="2" y="6" w="20" h="4" fill={headColor} />
+            <PixelRect x="2" y="6" w="2" h="8" fill={headColor} />
+            <PixelRect x="20" y="6" w="2" h="8" fill={headColor} />
+            <PixelRect x="10" y="6" w="4" h="4" fill={outline} />
+            <PixelRect x="4" y="10" w="2" h="2" fill={shadow} />
+            <PixelRect x="18" y="10" w="2" h="2" fill={shadow} />
+          </g>
+        );
+      };
+
+      const Steve = ({ animation }) => (
+        <svg
+          viewBox="0 0 64 128"
+          className="w-32 h-64 md:w-40 md:h-80 drop-shadow-2xl filter contrast-125"
+        >
+          <g transform="translate(16, 10)">
+            <PixelRect x="8" y="0" w="16" h="16" fill={colors.steveSkin} />
+            <PixelRect x="8" y="0" w="16" h="4" fill={colors.steveHair} />
+            <PixelRect x="8" y="0" w="2" h="8" fill={colors.steveHair} />
+            <PixelRect x="22" y="0" w="2" h="8" fill={colors.steveHair} />
+            <PixelRect x="6" y="-2" w="20" h="6" fill={colors.diamond} />
+            <PixelRect x="6" y="-2" w="2" h="18" fill={colors.diamond} />
+            <PixelRect x="24" y="-2" w="2" h="18" fill={colors.diamond} />
+            <PixelRect x="14" y="-2" w="4" h="4" fill={colors.diamondDark} />
+            <PixelRect x="10" y="8" w="4" h="2" fill="#FFFFFF" />
+            <PixelRect x="18" y="8" w="4" h="2" fill="#FFFFFF" />
+            <PixelRect x="12" y="8" w="2" h="2" fill="#4B4068" />
+            <PixelRect x="18" y="8" w="2" h="2" fill="#4B4068" />
+            <PixelRect x="14" y="12" w="4" h="2" fill="#6B4130" />
+            <PixelRect x="8" y="16" w="16" h="24" fill={colors.diamond} />
+            <PixelRect x="8" y="16" w="16" h="2" fill={colors.diamondDark} />
+            <PixelRect
+              x="12"
+              y="20"
+              w="8"
+              h="12"
+              fill={colors.diamondDark}
+              opacity="0.6"
+            />
+            <PixelRect x="0" y="16" w="8" h="24" fill={colors.diamond} />
+            <PixelRect x="0" y="16" w="8" h="2" fill={colors.diamondDark} />
+            <PixelRect x="0" y="40" w="8" h="4" fill={colors.steveSkin} />
+            <g
+              className={animation === "animate-mine" ? "animate-mining" : ""}
+              style={{ transformOrigin: "24px 18px" }}
+            >
+              <PixelRect x="24" y="16" w="8" h="24" fill={colors.diamond} />
+              <PixelRect x="24" y="16" w="8" h="2" fill={colors.diamondDark} />
+              <PixelRect x="24" y="40" w="8" h="4" fill={colors.steveSkin} />
+              <g transform="translate(18, 28) rotate(45)">
+                <PickaxeTool material="diamond" />
+              </g>
+            </g>
+            <PixelRect x="8" y="40" w="8" h="24" fill={colors.diamond} />
+            <PixelRect x="16" y="40" w="8" h="24" fill={colors.diamond} />
+            <PixelRect
+              x="15"
+              y="40"
+              w="2"
+              h="24"
+              fill={colors.diamondDark}
+              opacity="0.3"
+            />
+            <PixelRect x="8" y="58" w="8" h="6" fill={colors.diamondDark} />
+            <PixelRect x="16" y="58" w="8" h="6" fill={colors.diamondDark} />
+          </g>
+        </svg>
+      );
+
+      const Alex = ({ animation }) => (
+        <svg
+          viewBox="0 0 64 128"
+          className="w-32 h-64 md:w-40 md:h-80 drop-shadow-2xl filter contrast-125"
+        >
+          <g transform="translate(16, 10)">
+            <PixelRect x="8" y="0" w="16" h="16" fill={colors.alexSkin} />
+            <PixelRect x="8" y="0" w="16" h="4" fill={colors.alexHair} />
+            <PixelRect x="6" y="0" w="2" h="16" fill={colors.alexHair} />
+            <PixelRect x="24" y="4" w="2" h="12" fill={colors.alexHair} />
+            <PixelRect x="22" y="12" w="4" h="8" fill={colors.alexHair} />
+            <PixelRect x="6" y="-2" w="20" h="4" fill={colors.iron} />
+            <PixelRect x="6" y="-2" w="2" h="10" fill={colors.iron} />
+            <PixelRect x="24" y="-2" w="2" h="10" fill={colors.iron} />
+            <PixelRect x="10" y="8" w="4" h="2" fill="#FFFFFF" />
+            <PixelRect x="18" y="8" w="4" h="2" fill="#FFFFFF" />
+            <PixelRect x="12" y="8" w="2" h="2" fill="#3A5C42" />
+            <PixelRect x="18" y="8" w="2" h="2" fill="#3A5C42" />
+            <PixelRect x="14" y="13" w="4" h="1" fill="#C98863" />
+            <PixelRect x="9" y="16" w="14" h="24" fill={colors.iron} />
+            <PixelRect x="9" y="16" w="14" h="2" fill={colors.ironDark} />
+            <PixelRect
+              x="13"
+              y="20"
+              w="6"
+              h="12"
+              fill={colors.ironDark}
+              opacity="0.6"
+            />
+            <PixelRect x="3" y="16" w="6" h="24" fill={colors.iron} />
+            <PixelRect x="3" y="16" w="6" h="2" fill={colors.ironDark} />
+            <PixelRect x="3" y="40" w="6" h="4" fill={colors.alexSkin} />
+            <g
+              className={animation === "animate-mine" ? "animate-mining" : ""}
+              style={{ transformOrigin: "24px 18px" }}
+            >
+              <PixelRect x="23" y="16" w="6" h="24" fill={colors.iron} />
+              <PixelRect x="23" y="16" w="6" h="2" fill={colors.ironDark} />
+              <PixelRect x="23" y="40" w="6" h="4" fill={colors.alexSkin} />
+              <g transform="translate(17, 28) rotate(45)">
+                <PickaxeTool material="iron" />
+              </g>
+            </g>
+            <PixelRect x="9" y="40" w="6" h="24" fill={colors.iron} />
+            <PixelRect x="17" y="40" w="6" h="24" fill={colors.iron} />
+            <PixelRect
+              x="15"
+              y="40"
+              w="2"
+              h="24"
+              fill={colors.ironDark}
+              opacity="0.3"
+            />
+            <PixelRect x="9" y="58" w="6" h="6" fill={colors.ironDark} />
+            <PixelRect x="17" y="58" w="6" h="6" fill={colors.ironDark} />
+          </g>
+        </svg>
+      );
+
+      const Creeper = () => (
+        <svg viewBox="0 0 64 128" className="w-24 h-48 animate-bounce">
+          <g transform="translate(16, 30)">
+            <PixelRect x="0" y="0" w="32" h="32" fill="#0DA74E" />
+            <PixelRect x="6" y="8" w="8" h="8" fill="#000" />
+            <PixelRect x="18" y="8" w="8" h="8" fill="#000" />
+            <PixelRect x="10" y="16" w="12" h="12" fill="#000" />
+            <PixelRect x="6" y="22" w="4" h="10" fill="#000" />
+            <PixelRect x="22" y="22" w="4" h="10" fill="#000" />
+            <PixelRect x="4" y="32" w="24" h="36" fill="#0DA74E" />
+            <PixelRect x="4" y="68" w="8" h="10" fill="#000" opacity="0.3" />
+            <PixelRect x="20" y="68" w="8" h="10" fill="#000" opacity="0.3" />
+          </g>
+        </svg>
+      );
+
+      const ParticleExplosion = ({ x, y }) => {
+        const particles = Array.from({ length: 8 }).map((_, i) => ({
+          id: i,
+          angle: (i / 8) * 360,
+          color: [colors.stone, colors.dirt, colors.grass][
+            Math.floor(Math.random() * 3)
+          ],
+        }));
+        return (
+          <div
+            className="absolute pointer-events-none"
+            style={{ left: x, top: y }}
+          >
+            {particles.map((p) => (
+              <div
+                key={p.id}
+                className="absolute w-2 h-2 rounded-sm animate-particle"
+                style={{ backgroundColor: p.color, "--angle": `${p.angle}deg` }}
+              />
+            ))}
+          </div>
+        );
+      };
+
+      const Confetti = () => {
+        const pieces = Array.from({ length: 50 }).map((_, i) => ({
+          id: i,
+          left: Math.random() * 100 + "%",
+          animationDelay: Math.random() * 2 + "s",
+          backgroundColor: [
+            colors.diamond,
+            colors.gold,
+            colors.emerald,
+            "#FF5555",
+          ][Math.floor(Math.random() * 4)],
+        }));
+        return (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none z-50">
+            {pieces.map((p) => (
+              <div
+                key={p.id}
+                className="absolute w-3 h-3 md:w-4 md:h-4 animate-fall"
+                style={{
+                  left: p.left,
+                  top: "-5%",
+                  backgroundColor: p.backgroundColor,
+                  animationDelay: p.animationDelay,
+                  boxShadow: "2px 2px 0 rgba(0,0,0,0.2)",
+                }}
+              />
+            ))}
+          </div>
+        );
+      };
+
+      const BlockButton = ({
+        onClick,
+        children,
+        type = "grass",
+        disabled = false,
+        className = "",
+      }) => {
+        const styles = {
+          grass: "bg-[#589C33] border-[#3F7224]",
+          stone: "bg-[#7D7D7D] border-[#555555]",
+          diamond: "bg-[#4DEEEA] border-[#29B6B3] text-gray-800",
+          obsidian: "bg-[#2A2335] border-[#141019] text-white",
+          book: "bg-[#8B4513] border-[#5D2906] text-white",
+          gold: "bg-[#FFD700] border-[#DAA520] text-[#5D2906] text-amber-900",
+          lapis: "bg-[#2644bd] border-[#182c80] text-white",
+        };
+        const baseStyle = styles[type] || styles.grass;
+        return (
+          <button
+            onClick={!disabled ? onClick : null}
+            disabled={disabled}
+            className={`relative px-6 py-4 text-xl md:text-2xl text-white shadow-[0_4px_0_0_rgba(0,0,0,0.2)] border-b-4 active:border-b-0 active:translate-y-1 transition-all rounded-sm flex items-center justify-center gap-2 ${baseStyle} ${
+              disabled
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:brightness-110"
+            } ${className}`}
+            style={pixelFont}
+          >
+            {children}
+          </button>
+        );
+      };
+
+      // --- 主程式邏輯 ---
+      function MinecraftMathGame() {
+        const [gameState, setGameState] = useState("menu");
+        const [selectedTable, setSelectedTable] = useState(null);
+        const [currentProblem, setCurrentProblem] = useState({
+          n1: 2,
+          n2: 2,
+          ans: 4,
+        });
+        const [options, setOptions] = useState([]);
+        const [inventory, setInventory] = useState({
+          diamond: 0,
+          emerald: 0,
+          gold: 0,
+        });
+        const [character, setCharacter] = useState("steve");
+        const [animation, setAnimation] = useState("");
+        const [feedback, setFeedback] = useState(null);
+        const [praiseText, setPraiseText] = useState("");
+        const [streak, setStreak] = useState(0);
+        const [highScore, setHighScore] = useState(0);
+        const [remainingMultipliers, setRemainingMultipliers] = useState([]);
+        const [sfxEnabled, setSfxEnabled] = useState(true);
+        const [reciteNumber, setReciteNumber] = useState(2);
+        const [revealedAnswers, setRevealedAnswers] = useState({});
+        const [miningParticle, setMiningParticle] = useState({
+          show: false,
+          x: 0,
+          y: 0,
+        });
+        const [hintData, setHintData] = useState({
+          show: false,
+          text: "",
+          loading: false,
+        });
+
+        const praises = [
+          "太神了!",
+          "挖得好!",
+          "超厲害!",
+          "完美!",
+          "鑽石級!",
+          "天才!",
+        ];
+        const milestones = [5, 10, 20, 30, 50];
+
+        const playSfx = (type, pitchShift = 0) =>
+          playSound(type, sfxEnabled, pitchShift);
+
+        const generateProblem = (table, currentRemaining) => {
+          let n1, n2;
+          if (table === "mixed") {
+            n1 = Math.floor(Math.random() * 8) + 2;
+            n2 = Math.floor(Math.random() * 9) + 1;
+          } else {
+            n1 = table;
+            const available =
+              currentRemaining && currentRemaining.length > 0
+                ? currentRemaining
+                : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+            const randomIndex = Math.floor(Math.random() * available.length);
+            n2 = available[randomIndex];
+          }
+          const ans = n1 * n2;
+          let wrong1 = ans + (Math.floor(Math.random() * 5) + 1);
+          let wrong2 = ans - (Math.floor(Math.random() * 5) + 1);
+          if (wrong2 <= 0) wrong2 = ans + 10;
+          if (wrong1 === wrong2) wrong1 += 1;
+          const opts = [ans, wrong1, wrong2].sort(() => Math.random() - 0.5);
+          setCurrentProblem({ n1, n2, ans });
+          setOptions(opts);
+          setFeedback(null);
+          setAnimation("");
+          setHintData({ show: false, text: "", loading: false });
+        };
+
+        const generateOfflineHint = (n1, n2) => {
+          const total = n1 * n2;
+          if (n1 === 7 && n2 === 8)
+            return `想像有 7 隻蜘蛛，每隻有 8 條腿，總共就是 ${total} 條腿！`;
+          if (n1 === 8 && n2 === 7)
+            return `想像有 8 隻蜘蛛，每隻有 7 個眼睛(咦?)，總共是 ${total}！`;
+          if (n1 === 6 && n2 === 8)
+            return `6 個工作台，每個工作台放 8 個木板，總共 ${total} 個木板。`;
+          if (n1 === 8 && n2 === 6)
+            return `8 個工作台，每個工作台放 6 個木板，總共 ${total} 個木板。`;
+          if (n1 === 9 && n2 === 9)
+            return `9x9 是最大的挑戰！9 個發射器，每個有 9 支箭，總共 ${total} 支箭！`;
+          if (n1 === 8 && n2 === 8)
+            return `一組有 64 個物品，就像 8x8！想像 8 排方塊，每排 8 個，就是一整組！`;
+
+          const scenarios = [
+            {
+              items: ["鑽石", "鐵礦", "黃金", "紅石"],
+              containers: ["條礦脈", "個箱子", "堆礦石"],
+              template: (c, i) =>
+                `在礦坑發現了 ${n1} ${c}，每${c[0]}有 ${n2} 個${i}，算算看？`,
+            },
+            {
+              items: ["石磚", "木材", "玻璃", "火把"],
+              containers: ["根柱子", "面牆", "層樓"],
+              template: (c, i) =>
+                `我要蓋房子，蓋了 ${n1} ${c}，每${c[0]}用了 ${n2} 個${i}。`,
+            },
+            {
+              items: ["小麥", "胡蘿蔔", "馬鈴薯", "南瓜"],
+              containers: ["排田地", "個農場", "組種子"],
+              template: (c, i) =>
+                `在農田種了 ${n1} ${c}，每${c[0]}有 ${n2} 個${i}，大豐收！`,
+            },
+            {
+              items: ["殭屍", "骷髏", "史萊姆", "蜘蛛"],
+              containers: ["群", "波"],
+              template: (c, i) =>
+                `小心！有 ${n1} ${c}${i}，每${c}有 ${n2} 隻，快拿出你的劍！`,
+            },
+          ];
+          let scenarioIndex = Math.floor(Math.random() * scenarios.length);
+          if (total < 10) scenarioIndex = 1;
+          else if (total > 50) scenarioIndex = 0;
+          const s = scenarios[scenarioIndex];
+          const item = s.items[Math.floor(Math.random() * s.items.length)];
+          const container =
+            s.containers[Math.floor(Math.random() * s.containers.length)];
+          return s.template(container, item);
+        };
+
+        const getSteveHint = (n1, n2) => {
+          playSfx("pop");
+          setHintData({ show: true, text: "", loading: true });
+          setTimeout(() => {
+            setHintData({
+              show: true,
+              text: generateOfflineHint(n1, n2),
+              loading: false,
+            });
+            playSfx("pop");
+          }, 600);
+        };
+
+        const startGame = (table) => {
+          playSfx("click");
+          setSelectedTable(table);
+          setGameState("playing");
+          setCharacter(Math.random() > 0.5 ? "steve" : "alex");
+          if (typeof table === "number") {
+            const initial = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+            setRemainingMultipliers(initial);
+            generateProblem(table, initial);
+          } else {
+            setRemainingMultipliers([]);
+            generateProblem(table, []);
+          }
+        };
+
+        const handleAnswer = (val) => {
+          if (val === currentProblem.ans) {
+            const newStreak = streak + 1;
+            setStreak(newStreak);
+            if (newStreak > highScore) setHighScore(newStreak);
+            playSfx("correct", Math.min(newStreak, 10));
+            setFeedback("correct");
+            setAnimation("animate-mine");
+            setPraiseText(
+              milestones.includes(newStreak)
+                ? `火力全開! ${newStreak}連擊!`
+                : praises[Math.floor(Math.random() * praises.length)]
+            );
+            if (milestones.includes(newStreak)) playSfx("milestone");
+            setHintData((prev) => ({ ...prev, show: false }));
+
+            const loot = ["diamond", "emerald", "gold"][
+              Math.floor(Math.random() * 3)
+            ];
+            let isMastery = false;
+            if (typeof selectedTable === "number") {
+              const newRemaining = remainingMultipliers.filter(
+                (m) => m !== currentProblem.n2
+              );
+              setRemainingMultipliers(newRemaining);
+              if (newRemaining.length === 0) isMastery = true;
+            }
+            setTimeout(() => {
+              setInventory((prev) => ({ ...prev, [loot]: prev[loot] + 1 }));
+              if (isMastery) {
+                playSfx("fanfare");
+                setGameState("mastery");
+              } else {
+                playSfx("levelup");
+                setGameState("reward");
+              }
+              setAnimation("");
+            }, 800);
+          } else {
+            setStreak(0);
+            playSfx("incorrect");
+            setFeedback("incorrect");
+            setTimeout(() => setFeedback(null), 1500);
+          }
+        };
+
+        const nextProblem = () => {
+          playSfx("click");
+          setGameState("playing");
+          generateProblem(selectedTable, remainingMultipliers);
+        };
+        const goHome = () => {
+          playSfx("click");
+          setGameState("menu");
+        };
+        const startRecite = (num) => {
+          playSfx("click");
+          setReciteNumber(num);
+          setRevealedAnswers({});
+          setGameState("recite_table");
+        };
+        const handleReciteClick = (e, idx) => {
+          if (revealedAnswers[idx]) return;
+          playSfx("mine");
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMiningParticle({
+            show: true,
+            id: idx,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+          setTimeout(() => {
+            setRevealedAnswers((prev) => ({ ...prev, [idx]: true }));
+            setMiningParticle({ show: false, id: null, x: 0, y: 0 });
+            playSfx("pop");
+          }, 200);
+        };
+        const resetReveals = () => {
+          playSfx("click");
+          setRevealedAnswers({});
+        };
+
+        // --- 畫面渲染 ---
+        const MenuScreen = () => (
+          <div className="flex flex-col items-center w-full max-w-4xl p-4 animate-in fade-in zoom-in duration-500">
+            <h1
+              className="text-4xl md:text-6xl text-white mb-8 text-center drop-shadow-[0_5px_0_rgba(0,0,0,0.5)]"
+              style={pixelFont}
+            >
+              麥塊乘法冒險
+            </h1>
+            <div className="flex flex-col md:flex-row gap-8 w-full justify-center items-center">
+              <div className="bg-[#C6C6C6] p-6 rounded-sm border-4 border-[#373737] shadow-2xl flex flex-col items-center w-full max-w-sm hover:scale-105 transition-transform duration-300">
+                <h2
+                  className="text-[#373737] text-xl mb-4 text-center flex items-center gap-2"
+                  style={pixelFont}
+                >
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 64 64"
+                    className="inline-block"
+                  >
+                    <g transform="translate(10, 10)">
+                      <PickaxeTool material="diamond" />
+                    </g>
+                  </svg>
+                  挑戰模式
+                </h2>
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  {[2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <BlockButton
+                      key={num}
+                      type="stone"
+                      onClick={() => startGame(num)}
+                      className="px-2 py-2 text-lg"
+                    >
+                      {num}
+                    </BlockButton>
+                  ))}
+                  <BlockButton
+                    type="diamond"
+                    onClick={() => startGame("mixed")}
+                    className="col-span-1 px-2 py-2 text-sm"
+                  >
+                    隨機
+                  </BlockButton>
+                </div>
+              </div>
+              <div className="bg-[#8B4513] p-6 rounded-sm border-4 border-[#5D2906] shadow-2xl flex flex-col items-center w-full max-w-sm hover:scale-105 transition-transform duration-300">
+                <h2
+                  className="text-white text-xl mb-4 text-center flex items-center gap-2"
+                  style={pixelFont}
+                >
+                  <BookOpen className="w-6 h-6" /> 背誦合成表
+                </h2>
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  {[2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <BlockButton
+                      key={num}
+                      type="book"
+                      onClick={() => startRecite(num)}
+                      className="px-2 py-2 text-lg border-amber-900 bg-amber-700 hover:bg-amber-600"
+                    >
+                      {num}
+                    </BlockButton>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 flex gap-8 justify-center opacity-80 scale-90">
+              <div className="flex flex-col items-center animate-bounce-slow">
+                <Steve animation="" />
+              </div>
+              <div
+                className="flex flex-col items-center animate-bounce-slow"
+                style={{ animationDelay: "0.5s" }}
+              >
+                <Alex animation="" />
+              </div>
+            </div>
+          </div>
+        );
+
+        const ReciteTableScreen = () => {
+          const isAllRevealed = Object.keys(revealedAnswers).length === 9;
+          return (
+            <div className="flex flex-col items-center w-full h-full max-w-2xl px-4 pt-4 animate-in fade-in slide-in-from-bottom-4 pb-20">
+              <div className="flex justify-between items-center w-full mb-4 bg-[#C6C6C6] p-2 border-2 border-black rounded shadow-md sticky top-2 z-30">
+                <button
+                  onClick={goHome}
+                  className="bg-red-500 text-white px-3 py-1 rounded border-b-4 border-red-800 active:border-b-0 text-sm"
+                  style={pixelFont}
+                >
+                  <RotateCcw size={16} className="inline mr-1" /> 返回
+                </button>
+                <h2 className="text-2xl text-[#373737]" style={pixelFont}>
+                  {reciteNumber} 的合成表
+                </h2>
+                <button
+                  onClick={() => startGame(reciteNumber)}
+                  className="bg-green-600 text-white px-3 py-1 rounded border-b-4 border-green-800 active:border-b-0 text-sm"
+                  style={pixelFont}
+                >
+                  去挑戰 <Gem size={16} className="inline ml-1" />
+                </button>
+              </div>
+              {isAllRevealed && (
+                <div className="w-full mb-4 animate-in zoom-in duration-500">
+                  <button
+                    onClick={() => startGame(reciteNumber)}
+                    className="w-full bg-gradient-to-r from-yellow-300 to-yellow-500 border-4 border-yellow-700 p-4 rounded-lg shadow-xl flex items-center justify-center gap-4 text-yellow-900 group"
+                  >
+                    <Trophy
+                      size={48}
+                      className="animate-bounce text-yellow-800"
+                    />
+                    <div className="text-left">
+                      <div className="text-xl font-bold" style={pixelFont}>
+                        背誦完成！
+                      </div>
+                      <div className="text-sm">點擊這裡領取獎勵並開始挑戰</div>
+                    </div>
+                    <Star
+                      size={32}
+                      className="animate-spin-slow text-yellow-100"
+                    />
+                  </button>
+                </div>
+              )}
+              <div className="bg-[#E4D4AC] border-4 border-[#947447] w-full p-4 rounded shadow-xl overflow-y-auto">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between mb-3 last:mb-0 bg-[#C9A976] p-2 rounded border-2 border-[#8B5A2B]"
+                  >
+                    <div
+                      className="text-2xl md:text-3xl text-[#4A3424]"
+                      style={pixelFont}
+                    >
+                      {reciteNumber} × {i} ={" "}
+                    </div>
+                    <button
+                      onClick={(e) => handleReciteClick(e, i)}
+                      className={`relative w-20 h-10 md:w-24 md:h-12 flex items-center justify-center rounded border-b-4 transition-all ${
+                        revealedAnswers[i]
+                          ? "bg-[#F0E68C] border-[#DAA520] text-[#4A3424] scale-105"
+                          : "bg-[#7D7D7D] border-[#555555] active:scale-95"
+                      } ${
+                        miningParticle.show && miningParticle.id === i
+                          ? "animate-shake"
+                          : ""
+                      }`}
+                    >
+                      {miningParticle.show && miningParticle.id === i && (
+                        <ParticleExplosion
+                          x={miningParticle.x}
+                          y={miningParticle.y}
+                        />
+                      )}
+                      {revealedAnswers[i] ? (
+                        <span
+                          className="text-2xl md:text-3xl font-bold animate-in zoom-in spin-in-1"
+                          style={pixelFont}
+                        >
+                          {reciteNumber * i}
+                        </span>
+                      ) : (
+                        <div className="w-4 h-4 bg-[#555555] opacity-50 rotate-45 transform transition-transform group-hover:rotate-90"></div>
+                      )}
+                    </button>
+                  </div>
+                ))}
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={resetReveals}
+                    className="flex items-center gap-2 text-[#8B4513] hover:text-[#5D2906] font-bold py-2 px-4 rounded hover:bg-black/5 transition"
+                    style={pixelFont}
+                  >
+                    <Eraser size={20} /> 重新挖礦
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const GameScreen = () => (
+          <div className="flex flex-col items-center w-full h-full relative">
+            <div className="absolute top-2 right-2 md:top-4 md:right-4 flex flex-col md:flex-row gap-2 md:gap-3 items-end z-20">
+              <div className="flex gap-2">
+                <div
+                  className={`flex items-center gap-1 bg-[#2A2335] p-2 border-2 ${
+                    streak > 3
+                      ? "border-orange-500 animate-pulse"
+                      : "border-gray-600"
+                  } rounded-sm shadow-lg`}
+                >
+                  <Flame
+                    size={20}
+                    className={
+                      streak > 3
+                        ? "text-orange-500 fill-orange-500"
+                        : "text-gray-400"
+                    }
+                  />
+                  <span
+                    className="text-white font-bold min-w-[20px] text-right"
+                    style={pixelFont}
+                  >
+                    {streak}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 bg-[#2A2335] p-2 border-2 border-yellow-600 rounded-sm shadow-lg">
+                  <Trophy size={18} className="text-yellow-500" />
+                  <span
+                    className="text-yellow-500 font-bold min-w-[20px] text-right"
+                    style={pixelFont}
+                  >
+                    {highScore}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2 bg-[#C6C6C6] p-2 border-2 border-black rounded-sm shadow-lg">
+                {["diamond", "emerald", "gold"].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-2 bg-[#8B8B8B] p-2 border border-white/20 border-b-black/20"
+                  >
+                    <div
+                      className={`w-4 h-4 ${
+                        item === "diamond"
+                          ? "bg-cyan-400"
+                          : item === "emerald"
+                          ? "bg-green-500"
+                          : "bg-yellow-400"
+                      } border border-white`}
+                    ></div>
+                    <span
+                      className="text-white font-bold min-w-[20px] text-right"
+                      style={pixelFont}
+                    >
+                      {inventory[item]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={goHome}
+                className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-sm border-b-4 border-red-800 active:border-b-0 active:translate-y-1"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center mt-8 w-full max-w-2xl px-4">
+              <div className="h-80 flex items-end justify-center mb-4 relative w-full">
+                {feedback === "incorrect" && (
+                  <div className="absolute top-0 z-30 animate-bounce">
+                    <div
+                      className="bg-red-600 text-white px-6 py-3 rounded border-4 border-white shadow-xl text-xl"
+                      style={pixelFont}
+                    >
+                      Sss... 再試一次!
+                    </div>
+                  </div>
+                )}
+                {feedback === "correct" && (
+                  <div className="absolute top-0 z-30 animate-in zoom-in slide-in-from-bottom-4 duration-300">
+                    <div
+                      className={`bg-yellow-400 text-yellow-900 px-8 py-4 rounded border-b-8 border-yellow-600 shadow-2xl text-3xl md:text-5xl rotate-[-5deg] ${
+                        streak > 5
+                          ? "scale-110 border-orange-500 bg-orange-300 text-red-900"
+                          : ""
+                      }`}
+                      style={pixelFont}
+                    >
+                      {praiseText}
+                    </div>
+                  </div>
+                )}
+                {hintData.show && (
+                  <div className="absolute top-[-40px] z-40 w-full max-w-sm animate-in zoom-in slide-in-from-bottom-2 duration-300">
+                    <div className="bg-white border-4 border-black p-4 rounded-lg shadow-xl relative text-[#333]">
+                      {hintData.loading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <Sparkles className="animate-spin text-yellow-500" />
+                          <span style={pixelFont}>史蒂夫正在思考...</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <p
+                            className="text-lg leading-relaxed"
+                            style={pixelFont}
+                          >
+                            {hintData.text}
+                          </p>
+                          <button
+                            onClick={() =>
+                              setHintData({ show: false, text: "" })
+                            }
+                            className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full p-1 border-2 border-white hover:scale-110"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      )}
+                      <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r-4 border-b-4 border-black transform rotate-45"></div>
+                    </div>
+                  </div>
+                )}
+                {feedback === "incorrect" ? (
+                  <Creeper />
+                ) : character === "steve" ? (
+                  <Steve animation={animation} />
+                ) : (
+                  <Alex animation={animation} />
+                )}
+              </div>
+              <div className="bg-[#E4D4AC] border-y-4 border-[#947447] w-full py-6 mb-8 shadow-lg flex justify-center items-center relative transform transition-all hover:scale-105">
+                <div className="absolute top-0 w-full h-2 bg-[#C9A976]"></div>
+                <div
+                  className="text-5xl md:text-6xl text-[#463320] font-bold tracking-widest drop-shadow-sm"
+                  style={pixelFont}
+                >
+                  {currentProblem.n1} × {currentProblem.n2} = ?
+                </div>
+                <div className="absolute right-[-20px] top-[-20px] md:right-[-60px] md:top-1/2 md:-translate-y-1/2">
+                  <BlockButton
+                    type="lapis"
+                    onClick={() =>
+                      getSteveHint(currentProblem.n1, currentProblem.n2)
+                    }
+                    className="p-3 rounded-full hover:scale-110 active:scale-95 shadow-xl border-4"
+                  >
+                    <Star className="w-6 h-6 md:w-8 md:h-8 text-yellow-300 fill-current animate-pulse" />
+                  </BlockButton>
+                </div>
+                <div className="absolute bottom-0 w-full h-2 bg-[#C9A976]"></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 md:gap-8 w-full max-w-3xl z-10">
+                {options.map((opt, idx) => (
+                  <BlockButton
+                    key={idx}
+                    type="grass"
+                    onClick={() => handleAnswer(opt)}
+                    disabled={feedback !== null}
+                    className="text-2xl md:text-4xl py-6 md:py-8 hover:brightness-110 active:scale-95 active:bg-green-600 transition-transform"
+                  >
+                    {opt}
+                  </BlockButton>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+        const RewardScreen = () => {
+          useEffect(() => {
+            const timer = setTimeout(nextProblem, 3000);
+            return () => clearTimeout(timer);
+          }, []);
+          return (
+            <div className="flex flex-col items-center justify-center h-full animate-in zoom-in duration-300 relative">
+              <Confetti />
+              <h2
+                className="text-5xl md:text-6xl text-[#FFD700] mb-8 drop-shadow-[4px_4px_0_#000] z-10 animate-pulse"
+                style={pixelFont}
+              >
+                挖礦成功!
+              </h2>
+              <div className="bg-black/60 p-12 rounded-lg backdrop-blur-md border-4 border-white/50 flex flex-col items-center shadow-2xl z-10">
+                <div className="mb-8 filter drop-shadow-[0_0_25px_rgba(77,238,234,0.8)] animate-[spin_3s_linear_infinite]">
+                  <Gem
+                    size={128}
+                    color={colors.diamond}
+                    fill={colors.diamond}
+                  />
+                </div>
+                {streak > 1 && (
+                  <div className="mb-6 flex items-center gap-2 bg-orange-500/80 px-4 py-2 rounded-full border-2 border-orange-300 animate-bounce">
+                    <Flame className="text-yellow-200 fill-current" />
+                    <span className="text-white text-xl" style={pixelFont}>
+                      {streak} 連擊!
+                    </span>
+                  </div>
+                )}
+                <div className="flex gap-6">
+                  <BlockButton type="stone" onClick={goHome}>
+                    <RotateCcw /> 選單
+                  </BlockButton>
+                  <BlockButton
+                    type="diamond"
+                    onClick={nextProblem}
+                    className="animate-bounce-slow"
+                  >
+                    下一題!
+                  </BlockButton>
+                </div>
+                <p
+                  className="text-white mt-4 text-sm opacity-80"
+                  style={pixelFont}
+                >
+                  3秒後自動繼續...
+                </p>
+              </div>
+            </div>
+          );
+        };
+
+        const MasteryScreen = () => (
+          <div className="flex flex-col items-center justify-center h-full animate-in zoom-in duration-500 relative p-4">
+            <Confetti />
+            <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 p-1 rounded-lg shadow-[0_0_50px_rgba(255,215,0,0.6)] z-10 max-w-lg w-full transform hover:scale-105 transition-transform duration-500">
+              <div className="bg-[#2A2335] p-8 rounded-md border-4 border-yellow-300 flex flex-col items-center text-center">
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 bg-yellow-500 blur-2xl opacity-20 animate-pulse"></div>
+                  <Trophy
+                    size={140}
+                    className="text-yellow-400 drop-shadow-lg animate-bounce-slow"
+                    strokeWidth={1.5}
+                  />
+                  <Crown
+                    size={60}
+                    className="absolute -top-6 -right-6 text-yellow-200 animate-spin-slow"
+                    fill="gold"
+                  />
+                </div>
+                <h2
+                  className="text-4xl md:text-5xl text-yellow-400 mb-4"
+                  style={pixelFont}
+                >
+                  {selectedTable} 的乘法大師!
+                </h2>
+                <p className="text-gray-300 text-lg mb-8" style={pixelFont}>
+                  你已經完全掌握了 {selectedTable} 的所有乘法組合！太厲害了！
+                </p>
+                <div className="flex flex-col gap-4 w-full">
+                  <BlockButton
+                    type="diamond"
+                    onClick={goHome}
+                    className="w-full justify-center py-6 text-xl animate-pulse"
+                  >
+                    領取榮耀 (回選單) <Star className="fill-current" />
+                  </BlockButton>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+        return (
+          <div className="min-h-screen bg-[#ADD8E6] overflow-hidden flex flex-col items-center relative select-none font-sans">
+            <div className="absolute inset-0 bg-gradient-to-b from-[#6B8CFF] to-[#ADD8E6]"></div>
+            <div className="absolute top-10 left-[10%] w-32 h-12 bg-white/90"></div>
+            <div className="absolute top-24 left-[60%] w-48 h-16 bg-white/90"></div>
+            <div className="absolute top-5 left-[80%] w-24 h-8 bg-white/90"></div>
+            <button
+              onClick={() => setSfxEnabled(!sfxEnabled)}
+              className="absolute top-4 left-4 z-50 bg-white/20 p-2 rounded-full hover:bg-white/40 backdrop-blur-sm border-2 border-white/50 transition-all"
+            >
+              {sfxEnabled ? (
+                <Volume2 className="text-white" size={24} />
+              ) : (
+                <VolumeX className="text-white/50" size={24} />
+              )}
+            </button>
+            <div className="absolute bottom-0 w-full h-[20vh] bg-[#589C33] border-t-[10px] border-[#457C28] z-0">
+              <div
+                className="w-full h-full opacity-20"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(rgba(0,0,0,0.1) 2px, transparent 2px), linear-gradient(90deg, rgba(0,0,0,0.1) 2px, transparent 2px)",
+                  backgroundSize: "40px 40px",
+                }}
+              ></div>
+            </div>
+            <div className="z-10 w-full h-full flex flex-col items-center justify-center min-h-screen">
+              {gameState === "menu" && <MenuScreen />}
+              {gameState === "recite_table" && <ReciteTableScreen />}
+              {gameState === "playing" && <GameScreen />}
+              {gameState === "reward" && <RewardScreen />}
+              {gameState === "mastery" && <MasteryScreen />}
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<MinecraftMathGame />);
+    </script>
+  </body>
+</html>
